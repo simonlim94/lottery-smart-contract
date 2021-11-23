@@ -201,14 +201,14 @@ contract('Lottery', function (accounts) {
     await contract.putFunding({ value: ONE_ETH, from: contractCreator })
 
     const bettingNumber = 9999
-    let results = [] 
+    let results = []
     while (results.length < 23) {
       let r = Math.floor(Math.random() * 9999) + 0
       if (results.indexOf(r) === -1) results.push(r)
     }
-    
+
     // if found 9999 inside random drawing then replace with something else
-    let index = results.findIndex(result => result === 9999)
+    let index = results.findIndex((result) => result === 9999)
     if (index > -1) {
       results[index] = 1000
     }
@@ -230,5 +230,25 @@ contract('Lottery', function (accounts) {
     expect(web3.utils.toBN(initialBeneficiaryBalance)).to.eql(
       web3.utils.toBN(afterBeneficiaryBalance),
     )
+  })
+
+  it('event is emitted', async function () {
+    callback = function (error, event) {
+      expect(event.args.totalWinning.toNumber()).to.equal(10000)
+    }
+    contract.LotteryWinning(
+      {
+        fromBlock: 0,
+      },
+      callback
+    )
+
+    try {
+      await contract.putFunding({ value: ONE_ETH, from: contractCreator })
+      await contract.setCompletedState()
+      await contract.distributePrize(100, 100, beneficiaryAddress)
+    } catch (error) {
+      console.error(error)
+    }
   })
 })

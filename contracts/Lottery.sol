@@ -11,6 +11,11 @@ contract Lottery {
         Completed
     }
 
+    event LotteryWinning(
+        address addr,
+        uint totalWinning
+    );
+
     // drawResult consists of which lottery number in which ranking
     // starting from 1st, 2nd, 3rd, 10 special numbers and 10 consolation numbers
     // so in total of 23 numbers
@@ -96,6 +101,8 @@ contract Lottery {
 
         payable(buyerAddress).transfer(finalAmount);
         totalFund -= finalAmount;
+    
+        emit LotteryWinning(buyerAddress,finalAmount);
     }
 
     function buyLotteryTicket(uint256 bettingNumber)
