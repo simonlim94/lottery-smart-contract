@@ -5,10 +5,7 @@ contract('Lottery', function (accounts) {
   let contractCreator = accounts[0]
   let beneficiaryAddress = accounts[1]
   const ONGOING_STATE = 0
-  const COMPLETED_STATE = 1
   const ONE_ETH = 1000000000000000000
-  const ERROR_MSG =
-    'Returned error: VM Exception while processing transaction: revert'
 
   beforeEach(async function () {
     let winningRatios = [20, 10, 5]
@@ -240,13 +237,14 @@ contract('Lottery', function (accounts) {
       {
         fromBlock: 0,
       },
-      callback
+      callback,
     )
 
     try {
       await contract.putFunding({ value: ONE_ETH, from: contractCreator })
       await contract.setCompletedState()
       await contract.distributePrize(100, 100, beneficiaryAddress)
+      await contract.reset()
     } catch (error) {
       console.error(error)
     }

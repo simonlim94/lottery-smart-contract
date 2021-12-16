@@ -1,8 +1,13 @@
 pragma solidity ^0.8.9;
 
 contract Lottery {
-    struct LotteryTicket {
+    struct LotteryTicketByNumber {
         address buyer;
+        uint256 amount;
+    }
+
+    struct LotteryTicketByAddress {
+        uint256 number;
         uint256 amount;
     }
 
@@ -11,10 +16,7 @@ contract Lottery {
         Completed
     }
 
-    event LotteryWinning(
-        address addr,
-        uint totalWinning
-    );
+    event LotteryWinning(address addr, uint256 totalWinning);
 
     // drawResult consists of which lottery number in which ranking
     // starting from 1st, 2nd, 3rd, 10 special numbers and 10 consolation numbers
@@ -26,7 +28,16 @@ contract Lottery {
     uint256[] public winningRatios;
 
     // mapping of what kind of numbers that which buyer address is buying for a certain amount
-    mapping(uint256 => LotteryTicket[]) public lotteryTickets;
+    mapping(uint256 => LotteryTicketByNumber[]) public lotteryTicketsByNumber;
+
+    // mapping of which buyer address that what kind of number is being bought for a certain amount
+    mapping(address => LotteryTicketByAddress[]) public lotteryTicketsByAddress;
+
+    // records list of lottery numbers that are bought for "lotteryTicketsByNumber" for reset purpose
+    uint256[] public boughtNumbers;
+
+    // records list of buyer addresses that are bought for "lotteryTicketsByAddress" for reset purpose
+    address[] public boughtBuyerAddresses;
 
     // totalFund reserved for contract to distribute prize to buyer and
     // also collecting ticket fee from buyer
@@ -73,9 +84,14 @@ contract Lottery {
         drawResults = results;
 
         for (uint256 i = 0; i < results.length; i++) {
-            require(results[i] > 0 && results[i] < 10000, "Number must be between 0 and 9999");
+            require(
+                results[i] > 0 && results[i] < 10000,
+                "Number must be between 0 and 9999"
+            );
 
-            LotteryTicket[] storage tickets = lotteryTickets[results[i]];
+            LotteryTicketByNumber[] storage tickets = lotteryTicketsByNumber[
+                results[i]
+            ];
             if (tickets.length > 0) {
                 for (uint256 j = 0; j < tickets.length; j++) {
                     distributePrize(
@@ -101,8 +117,8 @@ contract Lottery {
 
         payable(buyerAddress).transfer(finalAmount);
         totalFund -= finalAmount;
-    
-        emit LotteryWinning(buyerAddress,finalAmount);
+
+        emit LotteryWinning(buyerAddress, finalAmount);
     }
 
     function buyLotteryTicket(uint256 bettingNumber)
@@ -114,12 +130,29 @@ contract Lottery {
             bettingNumber >= 0 && bettingNumber < 10000,
             "Invalid lottery number is provided"
         );
-        require(
-            msg.value > 0, "Invalid buying value"
-        );
+        require(msg.value > 0, "Invalid buying value");
 
-        LotteryTicket[] storage currentTickets = lotteryTickets[bettingNumber];
-        currentTickets.push(LotteryTicket(msg.sender, msg.value));
+        LotteryTicketByNumber[]
+            storage currentTicketByNumber = lotteryTicketsByNumber[
+                bettingNumber
+            ];
+
+        currentTicketByNumber.push(
+            LotteryTicketByNumber(msg.sender, msg.value)
+        );
+        boughtNumbers.push(bettingNumber);
+
+        LotteryTicketByAddress[]
+            storage currentTicketByAddress = lotteryTicketsByAddress[
+                msg.sender
+            ];
+
+        currentTicketByAddress.push(
+            LotteryTicketByAddress(bettingNumber, msg.value)
+        );
+        boughtBuyerAddresses.push(msg.sender);
+
+        totalFund += msg.value;
     }
 
     function putFunding() public payable {
@@ -138,15 +171,42 @@ contract Lottery {
         state = State.Completed;
     }
 
-    function setDrawResultDeadline(uint _drawResultDeadline) public {
+    function setDrawResultDeadline(uint256 _drawResultDeadline) public {
         drawResultDeadline = _drawResultDeadline;
     }
 
     function getLotteryTicketsForBettingNumber(uint256 bettingNumber)
         external
         view
-        returns (LotteryTicket[] memory)
+        returns (LotteryTicketByNumber[] memory)
     {
-        return lotteryTickets[bettingNumber];
+        return lotteryTicketsByNumber[bettingNumber];
+    }
+
+    function getLotteryTicketsForAddress(address buyerAddress)
+        external
+        view
+        returns (LotteryTicketByAddress[] memory)
+    {
+        return lotteryTicketsByAddress[buyerAddress];
+    }
+
+    function getDrawResults() external view returns (uint256[] memory) {
+        return drawResults;
+    }
+
+    function getWinningRatios() external view returns (uint256[] memory) {
+        return winningRatios;
+    }
+
+    function reset() public {
+        delete drawResults;
+        for (uint256 i = 0; i < boughtNumbers.length; i++) {
+            delete lotteryTicketsByNumber[boughtNumbers[i]];
+        }
+        for (uint256 i = 0; i < boughtBuyerAddresses.length; i++) {
+            delete lotteryTicketsByAddress[boughtBuyerAddresses[i]];
+        }
+        state = State.Ongoing;
     }
 }
